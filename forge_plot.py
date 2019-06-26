@@ -77,10 +77,10 @@ class MinFluPlot():
         # self.go_button = None
         self.main_chart= None
         self.trace_list = []
-        self.x_axis_title = "Not Set"
-        # self.y_axis_title = "Not Set"
+        self.x_axis_title = "DP"
+        self.y_axis_title = "Flow Rate"
         # self.y_axis2_title = "Not Set"
-        self.chart_title = "Unset Title"
+        self.chart_title = "Min Flu Plot"
         # self.y_axis_options = {}
         # self.chart_width = 800
         # self.chart_height = 400
@@ -128,7 +128,7 @@ class MinFluPlot():
 
         self.title_entry_box = widgets.VBox(children=[
             widgets.HBox(children=[widgets.Label('Chart Title:'), self.chart_title_entry]),
-            widgets.HBox(children=[widgets.Label('X Axis Title:'), self.xaxis_title_entry]),
+            # widgets.HBox(children=[widgets.Label('X Axis Title:'), self.xaxis_title_entry]),
             # widgets.HBox(children=[widgets.Label('Y Axis Title:'), self.yaxis_title_entry]),
             # widgets.HBox(children=[widgets.Label('Y Axis 2 Title:'), self.yaxis2_title_entry]),
         ])
@@ -174,38 +174,55 @@ class MinFluPlot():
         display(self._file_manager_box)
 
     def build_chart(self, sender):
+        #Grab selected traces from the gui
         flow_rate_col = self.flow_choice.value
         exhaust_col = self.exhaust_choice.value
         manifold_col = self.manifold_choice.value
-        #set flow rate as index
-        #add exhaust and mainfold as a col
-        flow_as_index = []
+        
+        #Create a temp file to write new values to
         temp_file = os.path.join(os.getcwd(), 'data/temp.csv')
         with open(temp_file, '+a') as _file:
+
+            #write index name and column name in file
             _file.write("FLOW_RATE,DP\n")
+            
+            #Iterate through imported data
             for i in range(0, len(self.full_data.index)-1):
                 #manifold - exhaust
+
+                #Get the values for this index item
                 flow = self.full_data[flow_rate_col][i]
                 manifold = self.full_data[manifold_col][i]
                 exhaust = self.full_data[exhaust_col][i]
+
+                #Calculate DP
                 dp = float(manifold) - float(exhaust)
+
+                #Write new values to the files
                 _file.write("%s,%s\n" % (flow, dp))
 
+        #Import data from the new created file                
         new_data = pandas.read_csv(temp_file, index_col=0)    
+        
+        #Delete the new file
         os.remove(temp_file)
+
+        #Create the Trace
         self.trace_list.append(graph_objects.Scatter(
             x=new_data.index,
             y=new_data['DP'],
             name='DP',
             mode='markers',
         ))
-        self.layout = Layout(title='Min Flu',
-                             xaxis=dict(title='Flow',
+
+        #Create the layout
+        self.layout = Layout(title=self.chart_title_entry.value,
+                             xaxis=dict(title='Flow Rate',
                                         showgrid=False,
                                         linecolor='black',
                                         ticks='outside',
                                         titlefont=dict(size=20)),
-                             yaxis=dict(title='Pressure',
+                             yaxis=dict(title="DP",
                                         showgrid=True,
                                         linecolor='black',
                                         ticks='outside'),
@@ -214,9 +231,12 @@ class MinFluPlot():
                              width=1000,
                              height=800)
 
+        #Create the chart
         self.main_chart = graph_objects.Figure(data=self.trace_list, layout=self.layout)
         self.status_label.value = 'Chart Built!'
-        offline.plot(self.main_chart)
+        
+        #Open the plot in a new window
+        offline.plot(self.main_chart, filename="%s.html" % self.chart_title_entry.value)
 
 
 
@@ -224,6 +244,8 @@ class MinFluPlot():
         file_list = os.listdir('data')
         widget_list = []
         widget_list.append(widgets.Label('Files in Data Directory'))
+        
+        #We want only 1 file, so do some checking..
         if len(file_list) == 1:
             self.status_label.value = "Import A File!!"
             self.import_files_button.disabled = False
@@ -238,10 +260,11 @@ class MinFluPlot():
             self.status_label.value = "Too Many Files in Data Directory!"
             for filename in file_list:
                 widget_list.append(widgets.Label(filename))
+
         self.file_list_box.children = widget_list
 
     def import_files(self, sender):
-        # self._file_manager_box.close()
+        
         self.import_files_button.disabled = True
         filename_list = os.listdir('data')
         import_error = False
@@ -257,40 +280,39 @@ class MinFluPlot():
             elif extension == '.txt' or extension == '.TXT':
                 data = pandas.read_csv("%s/data/%s" % (os.getcwd(), file_name), delimiter='\t', index_col=0)
             else:
+                # NO valid extensions found set data to None
                 data = None
+
             if data is not None:
                 try:
                     data.index = pandas.to_datetime(data.index)
+                    self.full_data = data
                 except ValueError as err:
                     import_error = True
                     error_message = err
-                # try:
-                #     data.index = pandas.to_datetime(data.index)
-                # except ValueError:
-                #     if (extension == '.txt') or (extension == '.TXT'):
-                #         data = self.digest_file(full_file)
-                #         data.index = pandas.to_datetime(data.index)
             else:
-                #todo handle this shit!
-                return
-            self.full_data = data
+                self.status_label.value = "Could not detect parsable file..."
+                import_error = True
+                error_message = "Could not detect parsable file!"
+
+            
             # if first:
             #     first = False
                 
             # else:
             #     self.full_data = self.full_data.join(data)
-        new_columns = []
-        for column in self.full_data.columns:
-            new_col = column.strip()
-            new_columns.append(new_col)
-        self.full_data.columns = new_columns
-        self.reg_col_list = []
-        for column in self.full_data:
-                 self.reg_col_list.append(column)
+        # new_columns = []
+        # for column in self.full_data.columns:
+        #     new_col = column.strip()
+        #     new_columns.append(new_col)
+        # self.full_data.columns = new_columns
+        # self.reg_col_list = []
+        # for column in self.full_data:
+        #          self.reg_col_list.append(column)
 
-        self.flow_choice.options = self.reg_col_list
-        self.exhaust_choice.options = self.reg_col_list
-        self.manifold_choice.options = self.reg_col_list
+        # self.flow_choice.options = self.reg_col_list
+        # self.exhaust_choice.options = self.reg_col_list
+        # self.manifold_choice.options = self.reg_col_list
         # self.break_choice_entry.options = self.reg_col_list
         # self.trace_choice_entry.options = self.reg_col_list
         if import_error:
@@ -306,6 +328,19 @@ class MinFluPlot():
             self.try_again.on_click(self.try_import_again)
             display(self.try_again)
         else:
+            #Format columns for use
+            new_columns = []
+            for column in self.full_data.columns:
+                new_col = column.strip()
+                new_columns.append(new_col)
+            self.full_data.columns = new_columns
+            self.reg_col_list = []
+            for column in self.full_data:
+                    self.reg_col_list.append(column)
+
+            self.flow_choice.options = self.reg_col_list
+            self.exhaust_choice.options = self.reg_col_list
+            self.manifold_choice.options = self.reg_col_list
             self._file_manager_box.close()
             self.status_label.value = 'Import Complete!'
             display(self.main_accordian)

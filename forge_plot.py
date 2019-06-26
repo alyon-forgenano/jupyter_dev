@@ -75,12 +75,12 @@ class MinFluPlot():
         # # self.do_y2_axis = False
         # self.go_button_visible = False
         # self.go_button = None
-        # self.main_chart= None
-        # self.trace_list = []
-        # self.x_axis_title = "Not Set"
+        self.main_chart= None
+        self.trace_list = []
+        self.x_axis_title = "Not Set"
         # self.y_axis_title = "Not Set"
         # self.y_axis2_title = "Not Set"
-        # self.chart_title = "Unset Title"
+        self.chart_title = "Unset Title"
         # self.y_axis_options = {}
         # self.chart_width = 800
         # self.chart_height = 400
@@ -90,8 +90,8 @@ class MinFluPlot():
         # self.upper_time_limit = '2017-11-07 18:00:00'
         # self.plot_range_data = None
         # self.chart_built = False
-        # self.layout = None
-
+        self.layout = None
+        self.reg_col_list = []
         self.status_label = widgets.Label()
         
 
@@ -119,8 +119,106 @@ class MinFluPlot():
         self.get_file_list('sender')
         self.file_manager_box.children = [self.check_for_files_button, self.import_files_button, self.file_list_box]
         self._file_manager_box.children = [self.choice_label, self.file_manager_box]
+
+        #Chart Title Widgets
+        self.chart_title_entry = widgets.Text(self.chart_title)
+        self.xaxis_title_entry = widgets.Text(self.x_axis_title)
+        # self.yaxis_title_entry = widgets.Text(self.y_axis_title)
+        # self.yaxis2_title_entry = widgets.Text(self.y_axis2_title)
+
+        self.title_entry_box = widgets.VBox(children=[
+            widgets.HBox(children=[widgets.Label('Chart Title:'), self.chart_title_entry]),
+            widgets.HBox(children=[widgets.Label('X Axis Title:'), self.xaxis_title_entry]),
+            # widgets.HBox(children=[widgets.Label('Y Axis Title:'), self.yaxis_title_entry]),
+            # widgets.HBox(children=[widgets.Label('Y Axis 2 Title:'), self.yaxis2_title_entry]),
+        ])
+
+        # self.chart_title_entry.observe(self.set_chart_title, names='value')
+        # self.xaxis_title_entry.observe(self.set_xaxis_title, names='value')
+        # self.yaxis_title_entry.observe(self.set_yaxis_title, names='value')
+        # self.yaxis2_title_entry.observe(self.set_yaxis_title, names='value')
+
+        #Options widgets
+        self.flow_choice = widgets.Dropdown(options=self.reg_col_list,
+                                            description='Flow Rate')
+
+        self.exhaust_choice = widgets.Dropdown(options=self.reg_col_list,
+                                                description='Exhaust PT')
+
+        self.manifold_choice = widgets.Dropdown(options=self.reg_col_list,
+                                                description='Manifold PT')
+
+        self.options_entry_box = widgets.HBox(children=[
+            self.flow_choice, self.exhaust_choice, self.manifold_choice
+        ])
+
+        self.main_accordian = widgets.Accordion(children=[
+            self.title_entry_box, self.options_entry_box
+        ])
+
+        self.main_accordian.set_title(0, "Chart Titles")
+        self.main_accordian.set_title(1, "Build Options")
+
+        self.go_button = widgets.Button(
+            description='Build Chart',
+            disabled=False,
+            button_style='success',  # 'success', 'info', 'warning', 'danger' or ''
+            tooltip='Build a Chart',
+            icon='check'
+        )
+
+        self.go_button.on_click(self.build_chart)
+
+        
         display(self.status_label)
         display(self._file_manager_box)
+
+    def build_chart(self, sender):
+        flow_rate_col = self.flow_choice.value
+        exhaust_col = self.exhaust_choice.value
+        manifold_col = self.manifold_choice.value
+        #set flow rate as index
+        #add exhaust and mainfold as a col
+        flow_as_index = []
+        temp_file = os.path.join(os.getcwd(), 'data/temp.csv')
+        with open(temp_file, '+a') as _file:
+            _file.write("FLOW_RATE,DP\n")
+            for i in range(0, len(self.full_data.index)-1):
+                #manifold - exhaust
+                flow = self.full_data[flow_rate_col][i]
+                manifold = self.full_data[manifold_col][i]
+                exhaust = self.full_data[exhaust_col][i]
+                dp = float(manifold) - float(exhaust)
+                _file.write("%s,%s\n" % (flow, dp))
+
+        new_data = pandas.read_csv(temp_file, index_col=0)    
+        os.remove(temp_file)
+        self.trace_list.append(graph_objects.Scatter(
+            x=new_data.index,
+            y=new_data['DP'],
+            name='DP',
+            mode='markers',
+        ))
+        self.layout = Layout(title='Min Flu',
+                             xaxis=dict(title='Flow',
+                                        showgrid=False,
+                                        linecolor='black',
+                                        ticks='outside',
+                                        titlefont=dict(size=20)),
+                             yaxis=dict(title='Pressure',
+                                        showgrid=True,
+                                        linecolor='black',
+                                        ticks='outside'),
+                             margin=dict(t=50),
+                             autosize=False,
+                             width=1000,
+                             height=800)
+
+        self.main_chart = graph_objects.Figure(data=self.trace_list, layout=self.layout)
+        self.status_label.value = 'Chart Built!'
+        offline.plot(self.main_chart)
+
+
 
     def get_file_list(self, sender):
         file_list = os.listdir('data')
@@ -143,7 +241,8 @@ class MinFluPlot():
         self.file_list_box.children = widget_list
 
     def import_files(self, sender):
-        self._file_manager_box.close()
+        # self._file_manager_box.close()
+        self.import_files_button.disabled = True
         filename_list = os.listdir('data')
         import_error = False
         error_message = "no error"
@@ -185,24 +284,39 @@ class MinFluPlot():
             new_col = column.strip()
             new_columns.append(new_col)
         self.full_data.columns = new_columns
-        # self.reg_col_list = []
-        # for column in self.full_data:
-                #  self.reg_col_list.append(column)
+        self.reg_col_list = []
+        for column in self.full_data:
+                 self.reg_col_list.append(column)
 
+        self.flow_choice.options = self.reg_col_list
+        self.exhaust_choice.options = self.reg_col_list
+        self.manifold_choice.options = self.reg_col_list
         # self.break_choice_entry.options = self.reg_col_list
         # self.trace_choice_entry.options = self.reg_col_list
         if import_error:
-            self.status_label.value = 'Invalid Data File: %s' % error_message
-            try_again = widgets.Button(
+            self.status_label.value = 'Invalid Data File: %s \nPlease Try Again' % error_message
+            self.check_for_files_button.disabled = True
+            self.try_again = widgets.Button(
                 description='Try Again...',
                 disabled=False,
                 button_style='danger',  # 'success', 'info', 'warning', 'danger' or ''
                 tooltip='Try Again...',
-                icon='check'
+                icon='trash'
             )
+            self.try_again.on_click(self.try_import_again)
+            display(self.try_again)
         else:
+            self._file_manager_box.close()
             self.status_label.value = 'Import Complete!'
+            display(self.main_accordian)
+            display(self.go_button)
 
+    def try_import_again(self, sender):
+        self.try_again.close()
+        self.check_for_files_button.disabled = False
+        # display(self._file_manager_box)
+        self.status_label.value = "Try Again!"
+        self.get_file_list(sender)
 
 #==============================================================================
 #==================================== STANDARD ================================

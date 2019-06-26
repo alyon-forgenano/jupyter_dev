@@ -32,12 +32,21 @@ class ForgePlot:
             tooltip='Create a Kwiky',
         )
 
+        self.min_flu_button = widgets.Button(
+            description='Min Flu Plot',
+            disabled=False,
+            button_style='info',
+            tooltip='Minimum Fluidization Plot',
+        )
+
         self.standard_button.on_click(self.go_standard)
         self.overlay_button.on_click(self.go_overlay)
         self.kwikplot_button.on_click(self.go_kwikplot)
+        self.min_flu_button.on_click(self.go_minflu)
+
         self.choice_label = widgets.Label('Choose Your Adventure....')
 
-        self.button_box = widgets.HBox(children=[self.standard_button, self.overlay_button, self.kwikplot_button])
+        self.button_box = widgets.HBox(children=[self.standard_button, self.overlay_button, self.kwikplot_button, self.min_flu_button])
 
         self.choice_box = widgets.VBox(children=[self.choice_label, self.button_box])
         display(self.choice_box)
@@ -54,7 +63,149 @@ class ForgePlot:
         self.choice_box.close()
         kp = KwikPlot()
 
+    def go_minflu(self, sender):
+        self.choice_box.close()
+        mf = MinFluPlot()
 
+#==============================================================================
+#==================================== MIN FLU =================================
+class MinFluPlot():
+    def __init__(self):
+        plotly.offline.init_notebook_mode(connected=True)
+        # # self.do_y2_axis = False
+        # self.go_button_visible = False
+        # self.go_button = None
+        # self.main_chart= None
+        # self.trace_list = []
+        # self.x_axis_title = "Not Set"
+        # self.y_axis_title = "Not Set"
+        # self.y_axis2_title = "Not Set"
+        # self.chart_title = "Unset Title"
+        # self.y_axis_options = {}
+        # self.chart_width = 800
+        # self.chart_height = 400
+        # self.full_data = None
+        # self.time_range = dict
+        # self.lower_time_limit = '2017-11-07 17:00:00'
+        # self.upper_time_limit = '2017-11-07 18:00:00'
+        # self.plot_range_data = None
+        # self.chart_built = False
+        # self.layout = None
+
+        self.status_label = widgets.Label()
+        
+
+        #======================================= FILE MANAGER WIDGETS
+        self._file_manager_box = widgets.VBox()
+        self.file_manager_box = widgets.HBox()
+        self.file_list_box = widgets.VBox()
+        self.choice_label = widgets.Label('Min Flu Plot: 1 File Expected')
+        self.check_for_files_button = widgets.Button(
+            description='Check for Files',
+            disabled=False,
+            button_style='info',  # 'success', 'info', 'warning', 'danger' or ''
+            tooltip='Check for The Important ForgeNano Files',
+            icon='check'
+        )
+        self.check_for_files_button.on_click(self.get_file_list)
+        self.import_files_button = widgets.Button(
+            description='Import File',
+            disabled=False,
+            button_style='success',  # 'success', 'info', 'warning', 'danger' or ''
+            tooltip='Import This Important File',
+            icon='check'
+        )
+        self.import_files_button.on_click(self.import_files)
+        self.get_file_list('sender')
+        self.file_manager_box.children = [self.check_for_files_button, self.import_files_button, self.file_list_box]
+        self._file_manager_box.children = [self.choice_label, self.file_manager_box]
+        display(self.status_label)
+        display(self._file_manager_box)
+
+    def get_file_list(self, sender):
+        file_list = os.listdir('data')
+        widget_list = []
+        widget_list.append(widgets.Label('Files in Data Directory'))
+        if len(file_list) == 1:
+            self.status_label.value = "Import A File!!"
+            self.import_files_button.disabled = False
+            for filename in file_list:
+                widget_list.append(widgets.Label(filename))
+        elif len(file_list) == 0:
+            self.status_label.value = "No Files in Data Directory!"
+            self.import_files_button.disabled = True
+            widget_list.append(widgets.Label('No Files!'))
+        elif len(file_list) > 1:
+            self.import_files_button.disabled = True
+            self.status_label.value = "Too Many Files in Data Directory!"
+            for filename in file_list:
+                widget_list.append(widgets.Label(filename))
+        self.file_list_box.children = widget_list
+
+    def import_files(self, sender):
+        self._file_manager_box.close()
+        filename_list = os.listdir('data')
+        import_error = False
+        error_message = "no error"
+        # first = True
+        self.status_label.value = 'Importing Files...'
+        # display(self.status_label)
+        for file_name in filename_list:
+            self.status_label.value = 'Importing: %s' % file_name
+            filename, extension = os.path.splitext(file_name)
+            if extension == '.csv' or extension == '.CSV' or extension == '':
+                data = pandas.read_csv("%s/data/%s" % (os.getcwd(), file_name), index_col=0)
+            elif extension == '.txt' or extension == '.TXT':
+                data = pandas.read_csv("%s/data/%s" % (os.getcwd(), file_name), delimiter='\t', index_col=0)
+            else:
+                data = None
+            if data is not None:
+                try:
+                    data.index = pandas.to_datetime(data.index)
+                except ValueError as err:
+                    import_error = True
+                    error_message = err
+                # try:
+                #     data.index = pandas.to_datetime(data.index)
+                # except ValueError:
+                #     if (extension == '.txt') or (extension == '.TXT'):
+                #         data = self.digest_file(full_file)
+                #         data.index = pandas.to_datetime(data.index)
+            else:
+                #todo handle this shit!
+                return
+            self.full_data = data
+            # if first:
+            #     first = False
+                
+            # else:
+            #     self.full_data = self.full_data.join(data)
+        new_columns = []
+        for column in self.full_data.columns:
+            new_col = column.strip()
+            new_columns.append(new_col)
+        self.full_data.columns = new_columns
+        # self.reg_col_list = []
+        # for column in self.full_data:
+                #  self.reg_col_list.append(column)
+
+        # self.break_choice_entry.options = self.reg_col_list
+        # self.trace_choice_entry.options = self.reg_col_list
+        if import_error:
+            self.status_label.value = 'Invalid Data File: %s' % error_message
+            try_again = widgets.Button(
+                description='Try Again...',
+                disabled=False,
+                button_style='danger',  # 'success', 'info', 'warning', 'danger' or ''
+                tooltip='Try Again...',
+                icon='check'
+            )
+        else:
+            self.status_label.value = 'Import Complete!'
+
+
+#==============================================================================
+#==================================== STANDARD ================================
 class StandardPlot():
     def __init__(self):
         plotly.offline.init_notebook_mode(connected=True)
@@ -144,7 +295,7 @@ class StandardPlot():
 
         #=========================================== TRACE MANAGER
         self.reg_col_selection = widgets.Dropdown()
-        self. mass_col_selection = widgets.Dropdown()
+        self.mass_col_selection = widgets.Dropdown()
 
         self.reg_col_selection.observe(self.auto_set_title_entry, names='value')
         self.mass_col_selection.observe(self.auto_set_title_mass_entry, names='value')
@@ -488,8 +639,9 @@ class StandardPlot():
                 # If we're working on the mass list take appropriate action
                 if build_mass_list:
                     while '' in items: items.remove('')
-                    sub = items[1].split('.')
-                    name = "Mass %s" % (sub[0])
+                    # sub = items[1].split('.')
+                    # name = "Mass %s" % (sub[0])
+                    name = items[2]
                     mass_list[items[0]] = name
                     _mass_list.append(name)
 
@@ -524,6 +676,8 @@ class StandardPlot():
         return data
 
 
+#==============================================================================
+#==================================== OVERLAY =================================
 class OverlayPlot():
     def __init__(self):
         plotly.offline.init_notebook_mode(connected=True)
@@ -682,8 +836,9 @@ class OverlayPlot():
                                          widgets.Label('  Finish: %s' % cycle['finish'])])
             children.append(row)
             sub_set = self.full_data.loc[cycle['start']:cycle['finish']]
-            ilist = []
+            ilist = [] #index list
             [ilist.append(idx) for idx in range(0, len(sub_set.index))]
+            #reset index so first data point is at index 0 for all subsets
             sub_set.index = ilist
             data_sets.append(sub_set)
             trace_list.append(graph_objects.Scatter(
@@ -744,6 +899,12 @@ class OverlayPlot():
                 data = None
             if data is not None:
                 data.index = pandas.to_datetime(data.index)
+                # try:
+                #     data.index = pandas.to_datetime(data.index)
+                # except ValueError:
+                #     if (extension == '.txt') or (extension == '.TXT'):
+                #         data = self.digest_file(full_file)
+                #         data.index = pandas.to_datetime(data.index)
             else:
                 #todo handle this shit!
                 return
@@ -780,7 +941,86 @@ class OverlayPlot():
             widget_list.append(widgets.Label('No Files!'))
         self.file_list_box.children = widget_list
 
+    # def digest_file(self, file_name):
+    #     self.status_label.value = 'RGA File Detected... Handling it...'
+    #     mass_list = dict()
+    #     _mass_list = ['time_stamp']
+    #     start_time = None
+    #     start_write = False
+    #     temp_file = os.path.join(os.getcwd(), 'data/temp.csv')
+    #     with open(file_name, 'r') as _file:
+    #         do_loop = True
+    #         build_mass_list = False
+    #         mass_list_done = False
+    #         header_written = False
+    #         loop_count = 1
+    #         while do_loop:
+    #             line = _file.readline()
+    #             if line == '':
+    #                 do_loop = False
+    #                 break
+    #             # Extract the start time and convert to date time object
+    #             if 'Start time' in line:
+    #                 sub = line.split(',')
+    #                 s = sub[2].split("\n")
+    #                 string_start = "%s%s" % (sub[1], s[0])
+    #                 _sub = string_start.split(' ')
+    #                 while '' in _sub: _sub.remove('')
+    #                 f_string = ",".join(_sub)
+    #                 start_time = datetime.strptime(f_string, '%b,%d,%Y,%I:%M:%S,%p')
 
+    #             items = line.split(' ')
+    #             # Find first line list channel mass relationships
+    #             if items[0] == '1':
+    #                 build_mass_list = True
+    #             # First line after the mass list
+    #             if build_mass_list and items[0] == "\n":
+    #                 build_mass_list = False
+    #                 mass_list_done = True
+
+    #             # If we're working on the mass list take appropriate action
+    #             if build_mass_list:
+    #                 while '' in items: items.remove('')
+    #                 # sub = items[1].split('.')
+    #                 # name = "Mass %s" % (sub[0])
+    #                 name = items[2]
+    #                 mass_list[items[0]] = name
+    #                 _mass_list.append(name)
+
+    #             # Header is written, finish it up
+    #             if header_written:
+    #                 if (items[0] != "\n") and (not start_write):
+    #                     start_write = True
+
+    #             if start_write:
+    #                 while '' in items: items.remove('')
+    #                 items.pop((len(items) - 1))
+    #                 milliseconds = float(items[0].strip(',')) * 1000
+    #                 timestamp = start_time + timedelta(milliseconds=milliseconds)
+    #                 timestamp_string = "%s," % timestamp.strftime("%Y-%m-%d %H:%M:%S")
+    #                 items[0] = timestamp_string
+    #                 items[(len(items) - 1)] = items[(len(items) - 1)].strip(',')
+    #                 line_string = "".join(items)
+    #                 with open(temp_file, '+a') as temp:
+    #                     temp.write("%s\n" % line_string)
+
+    #             # Start doing crap after the mass list is ready
+    #             if mass_list_done and (not header_written):
+    #                 if items[0] == 'Time(s)':
+    #                     header_string = ','.join(_mass_list)
+    #                     with open(temp_file, '+a') as temp:
+    #                         temp.write("%s\n" % header_string)
+    #                     header_written = True
+
+    #             loop_count += 1
+    #     data = pandas.read_csv("%s/data/%s" % (os.getcwd(), 'temp.csv'), index_col=0)
+    #     os.remove("%s/data/%s" % (os.getcwd(), 'temp.csv'))
+    #     return data
+
+
+
+#==============================================================================
+#==================================== KWIK PLOT ===============================
 class KwikPlot():
     def __init__(self):
         self.status_label = widgets.Label()
@@ -842,6 +1082,7 @@ class KwikPlot():
 
             else:
                 data = None
+
             if data is not None:
                 data.index = pandas.to_datetime(data.index)
 

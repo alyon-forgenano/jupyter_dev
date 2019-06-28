@@ -148,8 +148,11 @@ class MinFluPlot():
         self.manifold_choice = widgets.Dropdown(options=self.reg_col_list,
                                                 description='Manifold PT')
 
-        self.options_entry_box = widgets.HBox(children=[
-            self.flow_choice, self.exhaust_choice, self.manifold_choice
+        self.max_flow_entry = widgets.Text('50')
+
+        self.options_entry_box = widgets.VBox(children=[
+            self.flow_choice, self.exhaust_choice, self.manifold_choice,
+            widgets.HBox(children=[widgets.Label('Max Flow:'), self.max_flow_entry, widgets.Label('sccm')])
         ])
 
         self.main_accordian = widgets.Accordion(children=[
@@ -181,38 +184,60 @@ class MinFluPlot():
         
         #Create a temp file to write new values to
         temp_file = os.path.join(os.getcwd(), 'data/temp.csv')
+        temp_file2 = os.path.join(os.getcwd(), 'data/temp2.csv')
         with open(temp_file, '+a') as _file:
+            with open(temp_file2, '+a') as _file2:
+                #write index name and column name in file
+                _file.write("FLOW_RATE,DP\n")
+                _file2.write("FLOW_RATE,DP\n")
+                max_flow_reached = False
+                #Iterate through imported data
+                for i in range(0, len(self.full_data.index)-1):
+                    #manifold - exhaust
 
-            #write index name and column name in file
-            _file.write("FLOW_RATE,DP\n")
-            
-            #Iterate through imported data
-            for i in range(0, len(self.full_data.index)-1):
-                #manifold - exhaust
+                    #Get the values for this index item
+                    flow = self.full_data[flow_rate_col][i]
+                    manifold = self.full_data[manifold_col][i]
+                    exhaust = self.full_data[exhaust_col][i]
 
-                #Get the values for this index item
-                flow = self.full_data[flow_rate_col][i]
-                manifold = self.full_data[manifold_col][i]
-                exhaust = self.full_data[exhaust_col][i]
+                    #Calculate DP
+                    dp = float(manifold) - float(exhaust)
 
-                #Calculate DP
-                dp = float(manifold) - float(exhaust)
+                    if (not max_flow_reached) and (float(flow) >= float(self.max_flow_entry.value)):
+                        max_flow_reached = True
+                    elif (not max_flow_reached) and (float(flow) < float(self.max_flow_entry.value)):
+                        _file.write("%s,%s\n" % (flow, dp))    
+                        
 
-                #Write new values to the files
-                _file.write("%s,%s\n" % (flow, dp))
+                    if max_flow_reached and (float(flow) < float(self.max_flow_entry.value)):
+                        _file2.write("%s,%s\n" % (flow, dp))
+                        
+                    
+
+                    #Write new values to the files
+                    # _file.write("%s,%s\n" % (flow, dp))
 
         #Import data from the new created file                
         new_data = pandas.read_csv(temp_file, index_col=0)    
-        
+        new_data2 = pandas.read_csv(temp_file2, index_col=0)  
         #Delete the new file
         os.remove(temp_file)
-
+        os.remove(temp_file2)
         #Create the Trace
         self.trace_list.append(graph_objects.Scatter(
             x=new_data.index,
             y=new_data['DP'],
-            name='DP',
+            name='DP Flow Increase',
             mode='markers',
+        ))
+
+        self.trace_list.append(graph_objects.Scatter(
+            x=new_data2.index,
+            y=new_data2['DP'],
+            name='DP Flow Decrease',
+            mode='markers',
+            xaxis='x2',
+            yaxis='y2'
         ))
 
         #Create the layout
@@ -225,11 +250,27 @@ class MinFluPlot():
                              yaxis=dict(title="DP",
                                         showgrid=True,
                                         linecolor='black',
-                                        ticks='outside'),
+                                        ticks='outside',
+                                        anchor='x',
+                                        domain=[0.6, 1]),
+                            xaxis2=dict(title='Flow Rate',
+                                        showgrid=False,
+                                        linecolor='black',
+                                        ticks='outside',
+                                        titlefont=dict(size=20),
+                                        anchor='y2'
+                                    ),
+                             yaxis2=dict(title="DP",
+                                        showgrid=False,
+                                        linecolor='black',
+                                        ticks='outside',
+                                        titlefont=dict(size=20),
+                                        domain=[0, 0.4],
+                                        anchor='x2'),
                              margin=dict(t=50),
                              autosize=False,
-                             width=1000,
-                             height=800)
+                             width=1300,
+                             height=1600)
 
         #Create the chart
         self.main_chart = graph_objects.Figure(data=self.trace_list, layout=self.layout)

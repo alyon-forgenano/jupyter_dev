@@ -1261,7 +1261,9 @@ class KwikPlot():
         display(self.status_label)
         filename_list = os.listdir('data')
         first = True
+        chart_title = ""
         for file_name in filename_list:
+            chart_title = file_name
             self.status_label.value = 'Importing %s ... Please Wait' % file_name
             filename, extension = os.path.splitext(file_name)
             if extension == '.csv' or extension == '.CSV' or extension == '':
@@ -1302,7 +1304,7 @@ class KwikPlot():
                 _key = _key.upper()
                 self.add_trace(key, _key)
 
-        self.layout = Layout(title='Kwik Plot',
+        self.layout = Layout(title=chart_title,
                              xaxis=dict(title='Time',
                                         showgrid=False,
                                         linecolor='black',
@@ -1314,12 +1316,12 @@ class KwikPlot():
                                         ticks='outside'),
                              margin=dict(t=50),
                              autosize=False,
-                             width=1000,
+                             width=1800,
                              height=800)
 
         self.main_chart = graph_objects.Figure(data=self.trace_list, layout=self.layout)
         self.status_label.value = 'Chart Built!'
-        offline.plot(self.main_chart)
+        offline.plot(self.main_chart, filename=("%s.html" % chart_title))
 
     def add_trace(self, key, name):
         self.trace_list.append(graph_objects.Scatter(
